@@ -1,0 +1,17 @@
+# Direct runtime pins used to validate glclap_hotword_retriever (Python 3.10, CUDA 12.8).
+# Transitive packages are resolved by pip. Install the CUDA-specific torch
+# wheels first as shown in README.md.
+torch==2.10.0
+torchaudio==2.10.0
+transformers==4.57.6
+numpy==2.2.6
+soundfile==0.13.1
+tqdm==4.70.0
+flask==3.1.1
+tensorboardX==2.6.4
+modelscope==1.27.1
+qwen-asr==0.0.6
+accelerate==1.12.0
+sentencepiece==0.2.0
+protobuf==6.33.6
+safetensors==0.7.0

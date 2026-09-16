@@ -1,0 +1,30 @@
+# ---- 大文件 / 数据（数据单独发布 ModelScope，不进 git）----
+runs/
+data/
+results_unified/
+*.pt
+*.blob
+*.wav
+*.mp3
+*.mp4
+*.srt
+*.jsonl
+*.tsv
+*.log
+*.bak*
+backups_*/
+
+# ---- 运行时 / 环境 ----
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+node_modules/
+output/
+voices/
+vendor_test/
+third_party/
+.DS_Store
+
+# ---- secrets / internal notes (never publish) ----
+*SERVER_KNOWLEDGE*

@@ -1,0 +1,76 @@
+# Canonical GLCLAP-Hotword experiment configuration.
+#
+# Values marked "observed" are confirmed by runs/glclap_hotword_retriever logs/metrics.
+# This file is the public source of truth used by scripts/train_glclap_hotword.sh.
+experiment: glclap_hotword_retriever
+seed: 7
+
+model:
+  base_model: Qwen/Qwen3-ASR-1.7B
+  base_model_content_commit: d69410f1c275f2b0fa60cbb9960edfcdb0ae0aec
+  base_model_download_revision: master
+  base_model_checksums: checksums/qwen3_asr_1.7b.sha256
+  adapter_hidden: 1024
+  projection_dim: 512
+  max_audio_seconds: 14.0
+  precision: fp16
+  freeze_base_model: true
+
+data:
+  release: glclap_hotword_v1
+  train_manifest: data/glclap_hotword/train.jsonl
+  valid_manifest: data/glclap_hotword/valid.jsonl
+  expected_train_rows: 1164214
+  valid_subsample: 8000
+  sampler: entity
+  pool_zh_raw: data/glclap_hotword/artifacts/pool_zh_q3.pt
+  pool_en_raw: data/glclap_hotword/artifacts/pool_en_q3.pt
+  pool_zh_words: data/glclap_hotword/artifacts/pool_zh.txt
+  pool_en_words: data/glclap_hotword/artifacts/pool_en.txt
+  hardneg_zh: data/glclap_hotword/artifacts/hardneg.zh.json
+  hardneg_en: data/glclap_hotword/artifacts/hardneg.en.json
+
+optimization:
+  epochs: 10
+  per_gpu_batch_size: 4
+  gradient_accumulation_steps: 16
+  reference_world_size: 2
+  effective_batch_size: 128
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  gradient_clip_norm: 1.0
+  warmup_ratio: 0.05
+  scheduler: cosine
+  final_learning_rate_ratio: 0.01
+
+negatives:
+  pool_negatives_per_language: 4095
+  hard_negative_topk: 10
+  expected_pool_zh_words: 174335
+  expected_pool_en_words: 551894
+
+evaluation:
+  every_optimizer_steps: 9095
+  candidate_pool_size: 1000
+  retrieval_queries_per_validation: 500
+  early_stop_metric: val_r10
+  patience: 5
+  reference_best:
+    epoch: 3
+    step: 18190
+    val_r1: 0.5167
+    val_r5: 0.8500
+    val_r10: 0.9417
+    val_r20: 0.9583
+
+checkpointing:
+  save_every_steps: 2000
+  keep_step_checkpoints: 5
+  keep_best_checkpoints: 5
+  tensorboard_every_steps: 100
+
+hardware:
+  reference_gpus: 2
+  reference_gpu: NVIDIA RTX 4090 24GB
+  dataloader_workers_per_rank: 8
+  prefetch_factor: 2

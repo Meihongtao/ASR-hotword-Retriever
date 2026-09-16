@@ -1,0 +1,39 @@
+[project]
+name = "glclap"
+version = "0.1.0"
+description = "Global-Local Contrastive Language-Audio Pre-training for hotword retrieval: data construction, training and web demo built on frozen Qwen3-ASR dual towers"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    # ---- core (training / evaluation / web demo) ----
+    # CUDA builds: install torch first with the matching index, e.g.
+    #   pip install torch==2.10.0 torchaudio --index-url https://download.pytorch.org/whl/cu128
+    "torch>=2.4",
+    "torchaudio>=2.4",
+    "transformers==4.57.6",
+    "numpy",
+    "soundfile",
+    "tqdm",
+    "flask",
+    "tensorboardX",
+    "modelscope",  # dataset/model download (ModelScope)
+    # ---- official Qwen3-ASR transformers backend ----
+    "qwen-asr==0.0.6",
+    "accelerate",
+    "sentencepiece",
+    "protobuf",
+    "safetensors",
+]
+
+[project.optional-dependencies]
+entity = [
+    # entity_extract: local vLLM server for hotword extraction (4B model)
+    "vllm==0.17.0",
+    "fastapi",
+    "uvicorn",
+]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

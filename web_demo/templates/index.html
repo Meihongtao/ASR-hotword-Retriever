@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AmphionASR GLCLAP-Hotword 热词召回 Demo</title>
+<style>
+  :root { --bg:#0e1016; --card:#171a23; --card2:#1f2431; --card3:#252b3a;
+          --border:#2b3142; --txt:#e8eaf0; --muted:#98a0b3; --accent:#4f8cff;
+          --good:#37d67a; --ok:#8bd450; --warn:#ffc24b; --bad:#ff5d5d;
+          --mono:ui-monospace,"SF Mono",Consolas,monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+         font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:1180px; margin:0 auto; padding:22px 18px 90px; }
+  h1 { font-size:21px; margin:2px 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:16px; line-height:1.6; }
+  .grid { display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1.05fr); gap:16px; }
+  @media (max-width:900px){ .grid{grid-template-columns:1fr;} }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:15px; }
+  .card h2 { font-size:13px; margin:0 0 11px; color:var(--accent);
+             text-transform:uppercase; letter-spacing:.4px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:11px 0 4px; }
+  input[type=text], select, textarea { width:100%; background:var(--card2); color:var(--txt);
+    border:1px solid var(--border); border-radius:8px; padding:9px 10px; font-size:13px; }
+  textarea { font-family:var(--mono); min-height:96px; resize:vertical; line-height:1.5; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .chip { display:inline-block; background:var(--card2); border:1px solid var(--border);
+          border-radius:16px; padding:3px 11px; font-size:12px; margin:3px 3px 0 0; cursor:pointer; }
+  .chip:hover { border-color:var(--accent); }
+  .chip.on { background:rgba(79,140,255,.18); border-color:var(--accent); color:#c3d7ff; }
+  .btn { background:var(--accent); color:#fff; border:none; border-radius:8px;
+         padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn.ghost { background:var(--card2); border:1px solid var(--border); color:var(--txt); }
+  .btn.sm { padding:5px 11px; font-size:12px; font-weight:500; }
+  .drop { border:2px dashed var(--border); border-radius:10px; padding:18px; text-align:center;
+          color:var(--muted); font-size:13px; cursor:pointer; transition:.15s; }
+  .drop.hover { border-color:var(--accent); background:rgba(79,140,255,.06); }
+  .drop .name { color:var(--txt); font-weight:600; word-break:break-all; margin-top:5px; }
+  .hint { color:var(--muted); font-size:11.5px; margin-top:7px; line-height:1.6; }
+  .status { margin-top:9px; font-size:12.5px; color:var(--muted); min-height:18px; }
+  .status.err { color:var(--bad); }
+  .status.ok { color:var(--good); }
+  audio { width:100%; height:34px; }
+  .player { width:100%; margin-top:9px; }
+  /* ---- segment player ---- */
+  .segbar { display:flex; gap:6px; align-items:center; margin-top:7px; flex-wrap:wrap; }
+  .segbar .badge { font-family:var(--mono); font-size:11px; color:var(--muted); }
+  .loop-on { background:rgba(255,194,75,.16)!important; border-color:var(--warn)!important; }
+  /* ---- result table ---- */
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th, td { padding:7px 6px; text-align:left; border-bottom:1px solid var(--border); vertical-align:middle; }
+  th { color:var(--muted); font-weight:500; font-size:11px; white-space:nowrap; }
+  td.num, th.num { font-family:var(--mono); text-align:right; }
+  tbody tr { cursor:pointer; }
+  tbody tr:hover { background:rgba(79,140,255,.07); }
+  tbody tr.playing { background:rgba(255,194,75,.12)!important; }
+  .hw { font-weight:600; }
+  .hw-sub { display:block; color:var(--muted); font-size:10.5px; font-weight:400; margin-top:2px; }
+  .vtag { display:inline-block; font-size:10.5px; padding:2px 7px; border-radius:10px; white-space:nowrap; }
+  .v-good { background:rgba(55,214,122,.16); color:var(--good); }
+  .v-mid  { background:rgba(139,212,80,.16); color:var(--ok); }
+  .v-weak { background:rgba(255,194,75,.16); color:var(--warn); }
+  .v-bad  { background:rgba(255,93,93,.14); color:var(--bad); }
+  .probwrap { display:flex; align-items:center; gap:6px; min-width:96px; }
+  .probwrap .bar { flex:1; }
+  .bar { height:6px; border-radius:3px; background:var(--border); position:relative; min-width:44px; }
+  .bar i { position:absolute; left:0; top:0; bottom:0; border-radius:3px;
+           background:linear-gradient(90deg,#4f8cff,#37d67a); }
+  .prob { font-family:var(--mono); font-size:11px; min-width:42px; text-align:right; }
+  .playcell { white-space:nowrap; }
+  .playbtn { background:var(--card2); border:1px solid var(--border); color:var(--txt);
+             border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; }
+  .playbtn:hover { border-color:var(--accent); }
+  /* ---- waveform + overlay ---- */
+  .wavewrap { position:relative; width:100%; margin-top:14px; }
+  .wavewrap canvas { display:block; width:100%; cursor:crosshair; }
+  #wave { height:62px; background:var(--card2); border:1px solid var(--border); border-radius:8px 8px 0 0; }
+  #ovl  { height:96px; background:var(--card3); border:1px solid var(--border);
+          border-top:none; border-radius:0 0 8px 8px; cursor:pointer; }
+  .wavewrap .axis { position:relative; height:14px; font-family:var(--mono); font-size:10px; color:var(--muted); }
+  .wavewrap .axis span { position:absolute; transform:translateX(-50%); }
+  .legend { display:flex; gap:14px; font-size:11px; color:var(--muted); margin-top:7px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:10px; height:3px; border-radius:2px; margin-right:4px;
+              vertical-align:middle; }
+  .zoomrow { display:flex; gap:14px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+  .zoomrow label { margin:0; display:flex; align-items:center; gap:6px; }
+  input[type=range] { accent-color:var(--accent); }
+  .kv { font-family:var(--mono); font-size:11px; color:var(--muted); }
+  .tbl-hint { font-size:11.5px; color:var(--muted); margin-top:8px; line-height:1.7; }
+  .warnbox { color:var(--warn); font-size:12px; margin-top:9px; background:rgba(255,194,75,.08);
+             padding:8px 10px; border-radius:8px; line-height:1.6; }
+  .load-wrap { text-align:center; padding:30px 0; }
+  .spinner { width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--accent);
+             border-radius:50%; display:inline-block; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .scorebox { background:var(--card2); border:1px solid var(--border); border-radius:8px;
+              padding:9px 11px; margin-top:11px; font-size:11.5px; line-height:1.75; }
+  .scorebox b { color:var(--txt); font-family:var(--mono); }
+  details summary { cursor:pointer; color:var(--muted); font-size:11.5px; margin-top:8px; }
+  details[open] summary { margin-bottom:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎧 AmphionASR GLCLAP-Hotword 热词召回 Demo</h1>
+  <div class="sub">
+    上传音频 + 输入候选热词 → 模型按 <b>帧级对齐</b> 打分排序，并给出<b>热词出现的时间位置</b>（可点击播放该片段）。<br>
+    打分口径与训练/评估完全一致：<span class="kv">score = max<sub>t</sub> ⟨g<sub>audio</sub>(a<sub>t</sub>), g<sub>text</sub>(h)⟩</span>，
+    按 <b>cos</b> 排序；窗口分 <b>seg</b> 只用于定位与播放，不参与排序。
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>① 输入</h2>
+      <label>音频文件（wav / mp3 / m4a，任意采样率，自动转 16k 单声道）</label>
+      <div class="drop" id="drop">
+        <div>点击选择 或 拖拽音频到此处</div>
+        <div class="name" id="fname"></div>
+      </div>
+      <input type="file" id="file" accept="audio/*,.wav,.mp3,.m4a" hidden>
+      <div class="player" id="player" hidden>
+        <audio id="audioEl" controls preload="metadata"></audio>
+        <div class="segbar">
+          <button class="btn ghost sm" id="btnLoop" type="button">🔁 循环片段：关</button>
+          <span class="badge" id="segInfo">—</span>
+        </div>
+      </div>
+      <div class="row" style="margin-top:9px">
+        <button class="btn ghost sm" id="btnRec" type="button">🎙 录制</button>
+        <span class="badge" id="recStatus"></span>
+      </div>
+      <div class="row" style="margin-top:9px">
+        <button class="btn ghost sm" id="btnSample" type="button">🎲 随机验证样例</button>
+      </div>
+      <div class="hint" id="sampleInfo"></div>
+
+      <label>候选热词（逗号或换行分隔；词内空格会保留，如 “Fin FET”）</label>
+      <textarea id="hotwords" placeholder="GPU CPU NPU 华为昇腾 ..."></textarea>
+      <div id="quickChips"></div>
+    </div>
+
+    <div class="card">
+      <h2>② 参数</h2>
+      <label>模型</label>
+      <select id="model"></select>
+      <div class="hint" id="modelNote">
+        打分温度固定为训练值（GLCLAP-Hotword 学习到 ≈0.0148，即 softmax 尺度 ≈67.4），与训练/验证一致；
+        此处不提供温度调节，避免与评估口径不一致。
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div style="flex:1;min-width:150px">
+          <label>显示 TopK <span class="kv" id="vTopk">12</span></label>
+          <input type="range" id="topk" min="3" max="40" value="12" style="width:100%">
+        </div>
+        <div style="flex:1;min-width:150px">
+          <label>音频截断(秒) <span class="kv" id="vMax">90</span></label>
+          <input type="range" id="maxsec" min="5" max="300" step="5" value="90" style="width:100%">
+        </div>
+      </div>
+      <div class="hint">
+        ⚠️ 会议音频中位时长约 67 秒（最长 842 秒）。截断值必须覆盖热词所在位置，否则热词会被丢掉。
+      </div>
+      <div class="row" style="margin-top:9px">
+        <div style="flex:1;min-width:150px">
+          <label>池背景词数（估计随机词得分下限）<span class="kv" id="vPool">256</span></label>
+          <input type="range" id="pool" min="0" max="1024" step="64" value="256" style="width:100%">
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="btnRun">🚀 开始召回</button>
+        <button class="btn ghost" id="btnCheck">🔍 自检打分链路</button>
+        <button class="btn ghost" id="btnClear">清空</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <div class="card" id="resultCard" style="margin-top:16px; display:none">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">③ 召回结果</h2>
+      <span class="kv" id="meta"></span>
+    </div>
+
+    <div class="wavewrap">
+      <canvas id="wave"></canvas>
+      <canvas id="ovl"></canvas>
+      <div class="axis" id="axis"></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:#3a4155"></i>音频电平</span>
+      <span><i style="background:#4f8cff"></i>相似度曲线（当前选中热词）</span>
+      <span><i style="background:#ffc24b"></i>匹配片段</span>
+      <span id="cursorLegend"><i style="background:#fff"></i>播放头</span>
+      <span class="kv">在波形/曲线上点击 = 从该位置播放并选中该热词</span>
+    </div>
+    <div class="zoomrow">
+      <label class="kv">视图起点 <input type="range" id="viewStart" min="0" max="1000" value="0"></label>
+      <label class="kv">视图宽度 <input type="range" id="viewSpan" min="30" max="1000" value="1000"></label>
+      <button class="btn ghost sm" id="btnResetView" type="button">重置视图</button>
+    </div>
+
+    <table style="margin-top:12px">
+      <thead><tr>
+        <th>#</th><th>热词</th><th class="num" title="帧级最大余弦，与训练/评估一致，排序依据">cos</th>
+        <th title="最佳滑动窗口平均余弦，用于定位">seg</th>
+        <th title="窗口分 - 曲线均值，越大越像尖峰">对比度</th>
+        <th title="候选列表内 softmax；悬停可看训练温度下的原始概率">相对概率</th>
+        <th title="按实测分布标定的绝对判断">判断</th>
+        <th title="cos 减去本音频随机池词最高分">超出随机</th>
+        <th>匹配片段</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="tbl-hint" id="tblHint"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const QUICK = ["喷射混凝土","五跳","外柱","钢筋绑扎","王洋","成都","战场","费玉清","孙红",
+               "升主动脉","千层阶","层析柱","燃点试验","电动煨弯机","俯拍"];
+
+/* ---- calibrated verdict bands (kept in sync with retrieval_core.VERDICT_BANDS) ---- */
+let BANDS = [[0.72,"高置信命中","good"],[0.66,"较可能命中","mid"],[0.60,"弱匹配","weak"],[-1,"证据不足","bad"]];
+let CALIB_NOTE = "";
+
+function verdictOf(cos){
+  for (const [thr,label,css] of BANDS) if (cos >= thr) return {label, css};
+  return {label:"证据不足", css:"bad"};
+}
+
+/* ============================== state ============================== */
+let lastFile = null;
+let preparing = false;      // decoding / downloading audio right now
+let looping = false;        // loop the matched segment while playing
+let audioURL = null;
+let audioData = null;          // decoded Float32Array @16k for the waveform
+let audioDur = 0;
+let result = null;
+let selIdx = 0;                // selected row in result.results
+let viewStart = 0, viewSpan = 1;   // fractions of the full duration
+const SR = 16000;
+
+/* ============================== chips ============================== */
+function renderChips(){
+  const cur = new Set($("hotwords").value.split(/[,，;；\n\t]+/).map(s=>s.trim()).filter(Boolean));
+  const box = $("quickChips"); box.innerHTML = "";
+  QUICK.forEach(w=>{
+    const c = document.createElement("span");
+    c.className = "chip" + (cur.has(w) ? " on" : "");
+    c.textContent = w;
+    c.onclick = () => {
+      const arr = $("hotwords").value.split(/[,，;；\n\t]+/).map(s=>s.trim()).filter(Boolean);
+      const i = arr.indexOf(w);
+      if (i >= 0) arr.splice(i,1); else arr.push(w);
+      $("hotwords").value = arr.join(" ");
+      renderChips();
+    };
+    box.appendChild(c);
+  });
+}
+
+function setStatus(msg, kind){
+  $("status").innerHTML = msg || "";
+  $("status").className = "status" + (kind ? " " + kind : "");
+}
+
+/* ============================== init ============================== */
+async function init(){
+  const r = await fetch("/api/info").then(x=>x.json());
+  if (r.calibration) {
+    BANDS = r.calibration.bands.map(b => [b[0], b[1], b[3]]);
+    CALIB_NOTE = r.calibration.note || "";
+  }
+  const sel = $("model");
+  r.models.forEach(m => {
+    const o = document.createElement("option");
+    o.value = m; o.textContent = m;
+    sel.appendChild(o);
+  });
+  sel.value = r.default_model || r.models[0];
+  $("hotwords").value = QUICK.join(" ");
+  renderChips();
+}
+init();
+
+/* ============================== file input ============================== */
+const drop = $("drop"), file = $("file");
+drop.onclick = () => file.click();
+file.onchange = () => { if (file.files[0]) handleFile(file.files[0]); };
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("hover");
+}));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove("hover");
+}));
+drop.addEventListener("drop", e => {
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+async function handleFile(f){
+  preparing = true;
+  updateRunBtn();
+  lastFile = f;
+  $("fname").textContent = f.name + " (" + (f.size/1024/1024).toFixed(2) + " MB)";
+  if (audioURL) URL.revokeObjectURL(audioURL);
+  audioURL = URL.createObjectURL(f);
+  $("player").hidden = false;
+  $("audioEl").src = audioURL;
+  $("segInfo").textContent = "—";
+  // decode for the waveform view (works for any format the browser supports)
+  try {
+    const buf = await f.arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ab = await ctx.decodeAudioData(buf.slice(0));
+    ctx.close();
+    const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(ab.duration * SR)), SR);
+    const src = off.createBufferSource();
+    src.buffer = ab; src.connect(off.destination); src.start(0);
+    const rendered = await off.startRendering();
+    audioData = rendered.getChannelData(0);
+    audioDur = rendered.duration;
+    resetView();
+    setStatus(`已选择 ${f.name} · 时长 ${audioDur.toFixed(1)}s`);
+  } catch(e) {
+    audioData = null;
+    audioDur = 0;
+    setStatus("已选择文件，但浏览器无法解码该格式（波形不可见，召回仍可用）", "err");
+  } finally {
+    preparing = false;
+    updateRunBtn();
+  }
+}
+
+/** Run is disabled while audio is still being fetched/decoded, so a click can
+ *  never race the sample download and report a bogus "no audio" error. */
+function updateRunBtn(){
+  $("btnRun").disabled = preparing;
+  $("btnRun").textContent = preparing ? "⏳ 音频准备中…" : "🚀 开始召回";
+}
+
+/* ============================== recording ============================== */
+let mediaRec = null, recChunks = [], recTimer = null, recStream = null;
+const btnRec = $("btnRec");
+function stopRecording(){
+  clearInterval(recTimer);
+  if (mediaRec && mediaRec.state !== "inactive") mediaRec.stop();
+  if (recStream) recStream.getTracks().forEach(t => t.stop());
+}
+function encodeWav16k(samples, sampleRate){
+  const n = samples.length, buf = new ArrayBuffer(44 + n*2), v = new DataView(buf);
+  const ws = (o,s) => { for (let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  ws(0,"RIFF"); v.setUint32(4,36+n*2,true); ws(8,"WAVE");
+  ws(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sampleRate,true); v.setUint32(28,sampleRate*2,true);
+  v.setUint16(32,2,true); v.setUint16(34,16,true);
+  ws(36,"data"); v.setUint32(40,n*2,true);
+  let o = 44;
+  for (let i=0;i<n;i++){
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(o, s<0 ? s*0x8000 : s*0x7FFF, true); o += 2;
+  }
+  return new Blob([buf], {type:"audio/wav"});
+}
+btnRec.onclick = async () => {
+  if (mediaRec && mediaRec.state === "recording"){
+    mediaRec.stop(); btnRec.textContent = "🎙 录制";
+    $("recStatus").textContent = "处理中…"; return;
+  }
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRec = new MediaRecorder(recStream); recChunks = [];
+    mediaRec.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+    mediaRec.onstop = async () => {
+      const blob = new Blob(recChunks, {type: mediaRec.mimeType || "audio/webm"});
+      try {
+        const ab = await blob.arrayBuffer();
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const decoded = await ctx.decodeAudioData(ab); ctx.close();
+        const off = new OfflineAudioContext(1, Math.ceil(decoded.duration*SR), SR);
+        const src = off.createBufferSource();
+        src.buffer = decoded; src.connect(off.destination); src.start(0);
+        const rendered = await off.startRendering();
+        const wav = new File([encodeWav16k(rendered.getChannelData(0), SR)],
+                             "mic-recording.wav", {type:"audio/wav"});
+        await handleFile(wav);
+        $("recStatus").textContent = "✅ 已转为 16k WAV";
+        setTimeout(()=>{ $("recStatus").textContent = ""; }, 5000);
+      } catch(e){
+        setStatus("录音转码失败: " + (e.message||e), "err");
+        btnRec.textContent = "🎙 录制";
+      }
+    };
+    mediaRec.start(); btnRec.textContent = "⏹ 停止";
+    $("recStatus").textContent = "● 录音中…（说几个热词试试）";
+    recTimer = setInterval(()=>{
+      if (mediaRec && mediaRec.state === "recording"){
+        mediaRec.stop(); btnRec.textContent = "🎙 录制";
+        $("recStatus").textContent = "已自动停止（60s）";
+      }
+    }, 60000);
+  } catch(e){ setStatus("无法访问麦克风: " + (e.message||e), "err"); }
+};
+
+/* ============================== sample ============================== */
+$("btnSample").onclick = async () => {
+  preparing = true; updateRunBtn();
+  setStatus("获取随机验证样例…");
+  let r;
+  try {
+    r = await fetch("/api/sample").then(x=>x.json());
+  } catch(e) {
+    preparing = false; updateRunBtn();
+    return setStatus("样例获取失败: " + e.message, "err");
+  }
+  if (r.error) { preparing = false; updateRunBtn(); return setStatus(r.error, "err"); }
+  const ents = r.entities || [];
+  // entities are separate candidates; a newline keeps multi-word entities
+  // ("Fin FET") intact while still splitting them apart
+  $("hotwords").value = ents.join("\n");
+  renderChips();
+  $("sampleInfo").innerHTML =
+    `📄 <b>真值热词</b>：${ents.join(" / ") || "—"}<br>` +
+    `<span class="kv">转写：${(r.text||"").slice(0,70)}${(r.text||"").length>70?"…":""}</span>`;
+  try {
+    // Some validation audio sits on NFS mounts that can stall for tens of
+    // seconds, so cap the wait and tell the user instead of spinning forever.
+    const blob = await fetchTimeout(
+      "/api/audio?path=" + encodeURIComponent(r.audio), 45000,
+      "样例音频读取超时（该文件可能存放在较慢的存储上），请再点一次换一个样例");
+    await handleFile(new File([blob], r.audio.split("/").pop() || "sample.wav", {type:"audio/wav"}));
+    setStatus("✅ 样例已就绪，正在自动召回…");
+    await runRecall();          // one click = load + score
+  } catch(e){
+    preparing = false; updateRunBtn();
+    setStatus("样例音频加载失败: " + (e.message || e), "err");
+  }
+};
+
+/** fetch with an AbortController timeout so a slow/stalled server read cannot
+ *  leave the UI stuck on "准备中". */
+async function fetchTimeout(url, ms, timeoutMsg){
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), ms);
+  try {
+    const resp = await fetch(url, {signal: ac.signal});
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    return await resp.blob();
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error(timeoutMsg);
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/* ============================== run ============================== */
+$("btnRun").onclick = () => runRecall();
+
+async function runRecall(){
+  if (preparing) return setStatus("⏳ 音频还在准备中，请稍候…", "err");
+  if (!lastFile) return setStatus("请先选择、拖入或点“随机验证样例”加载音频", "err");
+  const hw = $("hotwords").value.trim();
+  if (!hw) return setStatus("请先输入热词", "err");
+  $("btnRun").disabled = true;
+  setStatus("⏳ 编码音频 + 打分中…");
+  const fd = new FormData();
+  fd.append("audio", lastFile);
+  fd.append("hotwords", hw);
+  fd.append("model", $("model").value);
+  fd.append("topk", $("topk").value);
+  fd.append("max_audio_seconds", $("maxsec").value);
+  fd.append("pool_size", $("pool").value);
+  try {
+    const r = await fetch("/api/recall", {method:"POST", body:fd}).then(x=>x.json());
+    if (r.error) { setStatus("错误: " + r.error, "err"); return; }
+    result = r; selIdx = 0;
+    renderResult(r);
+    const top = r.results[0];
+    setStatus(`✅ 完成 · 最佳命中 <b>${top.hotword}</b> · cos ${top.cos.toFixed(3)} · ` +
+              `判断 ${top.verdict} · 候选 ${r.n_candidates} 个`, "ok");
+  } catch(e){
+    setStatus("请求失败: " + e.message, "err");
+  } finally {
+    preparing = false;
+    updateRunBtn();
+  }
+}
+
+$("btnCheck").onclick = async () => {
+  setStatus("运行自检…");
+  try {
+    const r = await fetch("/api/selfcheck").then(x=>x.json());
+    if (r.error) return setStatus("自检失败: " + r.error, "err");
+    const d1 = r["batch_vs_single_maxdiff"];
+    setStatus("✅ 自检通过：帧时间映射、滑窗求和、批量/单条编码一致性"
+              + (d1 !== undefined ? `（最大偏差 ${d1}）` : ""), "ok");
+  } catch(e){ setStatus("自检请求失败: " + e.message, "err"); }
+};
+
+/* ============================== render ============================== */
+function fmtT(s){ return (s||0).toFixed(2) + "s"; }
+
+function renderResult(r){
+  $("resultCard").style.display = "";
+  const pm = r.pool_max && Object.keys(r.pool_max).length
+    ? Object.entries(r.pool_max).map(([k,v]) => `${k} ${v.toFixed(3)}`).join(" / ")
+    : null;
+  $("meta").textContent =
+    `${r.checkpoint} · ${r.n_frames} 帧 · ${r.duration}s · ${r.fps} fps`
+    + ` · 温度 ${r.temperature}`
+    + (pm ? ` · 本音频随机词最高分：${pm}（${r.pool_size} 个/语种）` : "");
+  const tb = $("tbody"); tb.innerHTML = "";
+  r.results.forEach((x, i) => {
+    const tr = document.createElement("tr");
+    tr.dataset.idx = i;
+    const v = verdictOf(x.cos);
+    const other = x.verdict !== v.label;          // backend band vs recomputed
+    const single = r.n_candidates < 2;   // softmax over 1 candidate is always 1.0
+    const maxPD = Math.max(...r.results.map(y => y.prob_display ?? y.prob));
+    const barW = single ? 0 : Math.max(2, Math.min(100, (x.prob_display ?? x.prob) * 100 / maxPD));
+    const dur = Math.max(0.1, x.seg_end - x.seg_start);
+    tr.innerHTML = `
+      <td class="num">${x.rank}</td>
+      <td><span class="hw">${esc(x.hotword)}</span>
+          <span class="hw-sub">${x.lang} · z=${x.z}</span></td>
+      <td class="num">${x.cos.toFixed(3)}</td>
+      <td class="num">${x.seg.toFixed(3)}</td>
+      <td class="num">${x.contrast.toFixed(3)}</td>
+      <td><div class="probwrap">
+            <div class="bar"><i style="width:${barW}%"></i></div>
+            <span class="prob" title="${single
+                ? '只有一个候选，概率恒为 100%，请多加几个候选词'
+                : '相对概率：候选列表内 softmax（展示尺度 ' + (r.display_scale ?? '') + '）'
+                  + '\n训练温度下该行概率 = ' + (x.prob*100).toFixed(4) + '%'}">${single ? "—" : ((x.prob_display ?? x.prob)*100).toFixed(1)+"%"}</span>
+          </div></td>
+      <td><span class="vtag v-${v.css}" title="绝对阈值 cos=${BANDS.find(b=>b[1]===v.label)[0]}">${v.label}</span>
+          ${other ? '<span class="kv" title="后端标定结果不一致">⚠</span>' : ''}</td>
+      <td class="playcell">
+        <button class="playbtn" data-play="${i}">▶</button>
+        <span class="kv">${fmtT(x.seg_start)}–${fmtT(x.seg_end)}</span>
+      </td>
+      <td class="num kv" title="该行 cos 减去本音频随机池词最高分（≥0 才算比随机词更像）">${
+        x.margin_over_pool === null || x.margin_over_pool === undefined
+          ? "—"
+          : (x.margin_over_pool >= 0 ? "+" : "") + x.margin_over_pool.toFixed(3)}</td>`;
+    tr.onclick = e => {
+      if (e.target.dataset.play !== undefined) { selectRow(i, true); playSeg(i); }
+      else selectRow(i, false);
+    };
+    tb.appendChild(tr);
+  });
+  // shared-candidate warning: many rows share one window => flat curve
+  const d = r.results;
+  const spread = d.length > 1 ? d[0].cos - d[d.length-1].cos : 1;
+  let tip = "";
+  if (d.length && d[0].cos < 0.62) {
+    // Do NOT claim the word is absent - a true word can score this low too.
+    tip = "⚠️ 最高分只有 " + d[0].cos.toFixed(3) + "（低于 0.66 判定线；随机干扰词也能达到这一水平），"
+        + "<b>无法确认</b>候选是否真的出现。请点 ▶ 听一下匹配片段再判断，"
+        + "或换一段含清晰热词的音频。";
+  } else if (spread < 0.05) {
+    tip = "⚠️ 候选之间分差很小（" + spread.toFixed(3) + "），排序区分度低，建议减少候选词或换更清晰的音频。";
+  } else if (d.length >= 3 && d[0].seg_start === d[2].seg_start) {
+    tip = "ℹ️ 前几名命中了<b>同一段音频</b>，说明该段与多个热词都相似（约 1 秒的共性），可对照听一下再判断。";
+  } else {
+    tip = "ℹ️ 点击任意一行可选中该热词（曲线/片段随之更新），点 ▶ 或直接点波形即可从对应位置播放。";
+  }
+  if (r.prob_saturated) {
+    tip += `<br><span class="kv">ℹ️ 训练温度（${r.temperature}）下 softmax 会饱和：`
+         + `最好一行 ${(d[0].prob*100).toFixed(2)}%，其余 ≈0.00%。`
+         + `表里显示的是便于比较的展示尺度（温度 ${r.display_temperature}），`
+         + `悬停某一行可看训练温度下的原始值。</span>`;
+  }
+  if (r.n_candidates < 2) {
+    tip += `<br><span class="kv">⚠️ 当前只有 ${r.n_candidates} 个候选热词，`
+         + `“相对概率”与排序都没有区分意义；请多输入几个候选词再对比。</span>`;
+  }
+  $("tblHint").innerHTML = tip
+    + `<br><span class="kv">排序依据是 cos（与训练/评估一致）；seg/对比度仅用于定位，不用来排序`
+    + `（实测：会议音频按 cos 排序 R@1=0.81，按 seg 只有 0.55）。</span>`
+    + (CALIB_NOTE ? `<br><span class="kv">${CALIB_NOTE}</span>` : "");
+  if (r.uploaded_duration && r.duration + 0.5 < r.uploaded_duration) {
+    const w = document.createElement("div");
+    w.className = "warnbox";
+    w.innerHTML = `⚠️ 音频原始时长 ${r.uploaded_duration}s，但只分析了前 ${r.duration}s（截断设置）。`
+                + `如果热词在后面，请把“音频截断”调大后重跑。`;
+    $("tblHint").appendChild(w);
+  }
+  selectRow(0, false);
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function selectRow(i, autoplay){
+  if (!result || !result.results.length) return;
+  selIdx = Math.max(0, Math.min(result.results.length - 1, i | 0));
+  [...$("tbody").children].forEach((tr, k) => tr.classList.toggle("playing", k === selIdx));
+  const x = result.results[selIdx];
+  if (x) {
+    $("segInfo").textContent =
+      `${x.hotword}：${x.seg_start.toFixed(2)}–${x.seg_end.toFixed(2)}s`
+      + `（共 ${(x.seg_end-x.seg_start).toFixed(2)}s，cos ${x.cos.toFixed(3)}）`;
+  }
+  drawAll();
+  if (autoplay) playSeg(selIdx);
+}
+
+/* ============================== audio playback ============================== */
+const audioEl = () => $("audioEl");
+
+function playSeg(i){
+  const x = result && result.results ? result.results[i] : null;
+  if (!x) return;
+  const a = audioEl();
+  if (!a || !isFinite(a.duration)) return;
+  const st = Math.max(0, x.seg_start - 0.15);
+  const en = Math.min(a.duration, x.seg_end + 0.15);
+  a.currentTime = st;
+  a.play();
+  $("segInfo").textContent =
+    `▶ ${esc(x.hotword)}：${x.seg_start.toFixed(2)}–${x.seg_end.toFixed(2)}s`
+    + `（播放 ${st.toFixed(2)}–${en.toFixed(2)}s${looping ? " · 循环中" : ""}）`;
+}
+
+$("btnLoop").onclick = () => {
+  looping = !looping;
+  $("btnLoop").textContent = "🔁 循环片段：" + (looping ? "开" : "关");
+  $("btnLoop").classList.toggle("loop-on", looping);
+  if (result && result.results[selIdx]) selectRow(selIdx, false);
+};
+
+$("audioEl").addEventListener("timeupdate", () => {
+  drawOverlay(); drawCursor();
+  if (!looping) return;
+  const x = result && result.results ? result.results[selIdx] : null;
+  if (!x) return;
+  const a = audioEl();
+  const en = Math.min(a.duration, x.seg_end + 0.15);
+  if (a.currentTime > en) {
+    a.currentTime = Math.max(0, x.seg_start - 0.15);
+    a.play();
+  }
+});
+$("audioEl").addEventListener("seeked", () => { drawOverlay(); drawCursor(); });
+$("audioEl").addEventListener("play", () => { drawOverlay(); drawCursor(); });
+$("audioEl").addEventListener("loadedmetadata", () => { drawAll(); });
+
+/* ============================== waveform + overlay ============================== */
+function resetView(){ viewStart = 0; viewSpan = 1; $("viewStart").value = 0; $("viewSpan").value = 1000; drawAll(); }
+$("btnResetView").onclick = resetView;
+$("viewStart").oninput = () => { viewStart = +$("viewStart").value / 1000; clampView(); drawAll(); };
+$("viewSpan").oninput  = () => { viewSpan  = +$("viewSpan").value  / 1000; clampView(); drawAll(); };
+function clampView(){
+  viewSpan = Math.max(0.03, Math.min(1, viewSpan));
+  viewStart = Math.max(0, Math.min(1 - viewSpan, viewStart));
+}
+
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || cv.parentElement.clientWidth, h = cv.clientHeight;
+  cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr);
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx, w, h};
+}
+
+function drawWave(){
+  const cv = $("wave");
+  if (!cv.clientWidth) return;
+  const {ctx, w, h} = setupCanvas(cv);
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = "#1f2431"; ctx.fillRect(0,0,w,h);
+  if (!audioData) {
+    ctx.fillStyle = "#98a0b3"; ctx.font = "11px sans-serif";
+    ctx.fillText("（浏览器无法解码该格式，波形不可用）", 10, h/2);
+    return;
+  }
+  const dur = audioDur || 1;
+  const s0 = Math.floor(viewStart*dur*SR), s1 = Math.min(audioData.length, Math.ceil((viewStart+viewSpan)*dur*SR));
+  const n = Math.max(1, s1 - s0), cols = Math.round(w);
+  const per = n / cols;
+  ctx.fillStyle = "#3a4155";
+  const mid = h/2;
+  for (let c = 0; c < cols; c++){
+    const a = s0 + Math.floor(c*per), b = Math.min(s1, s0 + Math.floor((c+1)*per));
+    let mn = 1, mx = -1;
+    for (let k = a; k < b; k++){
+      const v = audioData[k];
+      if (v < mn) mn = v; if (v > mx) mx = v;
+    }
+    if (b <= a) continue;
+    const y0 = mid - mx*(h/2-3), y1 = mid - mn*(h/2-3);
+    ctx.fillRect(c, y0, 1, Math.max(1, y1-y0));
+  }
+  // matched-segment highlight
+  const sel = result && result.results ? result.results[selIdx] : null;
+  if (sel){
+    const x = sel;
+    const gx = t2px(x.seg_start, w), gw = Math.max(2, t2px(x.seg_end, w) - gx);
+    ctx.fillStyle = "rgba(255,194,75,.16)";
+    ctx.fillRect(gx, 0, gw, h);
+    ctx.strokeStyle = "#ffc24b"; ctx.lineWidth = 1;
+    ctx.strokeRect(gx + .5, .5, gw - 1, h - 1);
+  }
+}
+
+function t2px(t, w){ return ((t / (audioDur||1)) - viewStart) / viewSpan * w; }
+function px2t(px, w){ return (viewStart + px/w*viewSpan) * (audioDur||1); }
+
+function drawOverlay(){
+  const cv = $("ovl");
+  if (!cv.clientWidth) return;
+  const {ctx, w, h} = setupCanvas(cv);
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = "#252b3a"; ctx.fillRect(0,0,w,h);
+  const x = result && result.results ? result.results[selIdx] : null;
+  if (!x){
+    ctx.fillStyle = "#98a0b3"; ctx.font = "11px sans-serif";
+    ctx.fillText("召回后在此显示相似度曲线", 10, h/2); return;
+  }
+  const ct = x.curve_t || [], cvv = x.curve || [];
+  if (ct.length < 2) return;
+  let mn = Infinity, mx = -Infinity;
+  for (const v of cvv){ if (v < mn) mn = v; if (v > mx) mx = v; }
+  const pad = Math.max(1e-3, (mx-mn)*0.15);
+  mn -= pad; mx += pad;
+  const yOf = v => h - 4 - (v - mn) / (mx - mn) * (h - 10);
+
+  // reference lines: measured best-of-999 negative p95 (meeting domain) and
+  // the 0.66 band edge
+  const guides = [[0.699, "#ff5d5d"], [0.66, "#ffc24b"]];
+  ctx.setLineDash([3,3]);
+  for (const [gv, col] of guides){
+    if (gv < mn || gv > mx) continue;
+    ctx.strokeStyle = col; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, yOf(gv)); ctx.lineTo(w, yOf(gv)); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // curve
+  ctx.strokeStyle = "#4f8cff"; ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < ct.length; i++){
+    const px = t2px(ct[i], w), py = yOf(cvv[i]);
+    if (px < -20 || px > w+20) { started = false; continue; }
+    if (!started){ ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // matched segment
+  const gx = t2px(x.seg_start, w), gw = Math.max(2, t2px(x.seg_end, w) - gx);
+  ctx.fillStyle = "rgba(255,194,75,.22)"; ctx.fillRect(gx, 0, gw, h);
+  ctx.strokeStyle = "#ffc24b"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(gx+.5,0); ctx.lineTo(gx+.5,h); ctx.moveTo(gx+gw-.5,0); ctx.lineTo(gx+gw-.5,h); ctx.stroke();
+
+  // peak marker
+  const pk = t2px(x.peak_sec, w);
+  ctx.strokeStyle = "#37d67a"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pk+.5,0); ctx.lineTo(pk+.5,h); ctx.stroke();
+
+  // readout
+  ctx.fillStyle = "#e8eaf0"; ctx.font = "10px ui-monospace,monospace";
+  ctx.fillText(`cos ${x.cos.toFixed(3)}  最高帧 ${x.peak_sec.toFixed(2)}s  (虚线=干扰词 p95 0.699 / 判断线 0.66)`, 6, 11);
+}
+
+function drawAxis(){
+  const ax = $("axis"); if (!ax) return;
+  const w = $("wave").clientWidth || 600;
+  const dur = audioDur || 1;
+  const n = 6; let html = "";
+  for (let i = 0; i <= n; i++){
+    const frac = i/n, t = (viewStart + frac*viewSpan) * dur;
+    html += `<span style="left:${(frac*100).toFixed(1)}%">${t.toFixed(1)}s</span>`;
+  }
+  ax.innerHTML = html;
+}
+
+function drawAll(){ drawWave(); drawOverlay(); drawAxis(); }
+
+/** Playhead is painted ON TOP of the similarity overlay (drawOverlay already
+ *  refills the canvas, so it must be called before stamping the line). */
+function drawCursor(){
+  const a = audioEl();
+  const cv = $("ovl");
+  if (!a || !isFinite(a.duration) || !cv || !cv.clientWidth) return;
+  const {ctx, w, h} = setupCanvas(cv);
+  const px = t2px(a.currentTime, w);
+  if (px < 0 || px > w) return;
+  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.fillRect(px-1, 0, 2, 4);
+}
+
+/* click-to-seek on both canvases */
+function bindSeek(cv){
+  cv.addEventListener("click", e => {
+    const a = audioEl();
+    if (!a || !isFinite(a.duration)) return;
+    const rect = cv.getBoundingClientRect();
+    const t = px2t(e.clientX - rect.left, rect.width);
+    a.currentTime = Math.max(0, Math.min(a.duration, t));
+    a.play();
+    drawCursor();
+  });
+}
+bindSeek($("wave")); bindSeek($("ovl"));
+
+/* ============================== sliders / clear ============================== */
+$("topk").oninput   = () => $("vTopk").textContent = $("topk").value;
+$("maxsec").oninput = () => $("vMax").textContent  = $("maxsec").value;
+$("pool").oninput   = () => $("vPool").textContent = $("pool").value;
+
+$("btnClear").onclick = () => {
+  stopRecording();
+  btnRec.textContent = "🎙 录制";
+  $("recStatus").textContent = "";
+  $("segInfo").textContent = "—";
+  looping = false;
+  $("btnLoop").textContent = "🔁 循环片段：关";
+  $("btnLoop").classList.remove("loop-on");
+  viewStart = 0; viewSpan = 1;
+  $("viewStart").value = 0; $("viewSpan").value = 1000;
+  $("resultCard").style.display = "none";
+  $("tbody").innerHTML = ""; $("tblHint").innerHTML = "";
+  $("fname").textContent = ""; $("player").hidden = true;
+  $("audioEl").removeAttribute("src"); $("audioEl").load();
+  $("sampleInfo").textContent = "";
+  if (audioURL) URL.revokeObjectURL(audioURL);
+  audioURL = null; audioData = null; audioDur = 0; result = null; lastFile = null;
+  preparing = false; updateRunBtn();
+  file.value = "";
+  setStatus("");
+  drawAll();
+};
+
+window.addEventListener("resize", () => drawAll());
+</script>
+</body>
+</html>

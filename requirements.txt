@@ -1,0 +1,20 @@
+# GLCLAP core requirements (training + evaluation + web demo).
+# Install torch with your CUDA build first, e.g. cu128:
+#   pip install torch==2.10.0 torchaudio --index-url https://download.pytorch.org/whl/cu128
+# Then: pip install -r requirements.txt
+torch>=2.4
+torchaudio>=2.4
+transformers==4.57.6
+numpy
+soundfile
+tqdm
+flask
+tensorboardX
+modelscope
+qwen-asr==0.0.6
+accelerate
+sentencepiece
+protobuf
+safetensors
+
+# entity_extract only (separate venv recommended): vllm==0.17.0 fastapi uvicorn

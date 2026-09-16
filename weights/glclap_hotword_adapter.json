@@ -1,0 +1,41 @@
+{
+  "adapter_hidden": "1024",
+  "base_model": "Qwen/Qwen3-ASR-1.7B",
+  "base_model_revision": "d69410f1c275f2b0fa60cbb9960edfcdb0ae0aec",
+  "bytes": 21018476,
+  "embedded_metadata": {
+    "adapter_hidden": "1024",
+    "base_model": "Qwen/Qwen3-ASR-1.7B",
+    "base_model_revision": "d69410f1c275f2b0fa60cbb9960edfcdb0ae0aec",
+    "experiment": "glclap_hotword_retriever",
+    "format": "glclap-adapter-v1",
+    "metrics": "{\"epoch\": 3, \"global_loss\": 0.015569547556340695, \"local_loss\": 0.23039130505919456, \"loss\": 0.24596085235476495, \"step\": 18190, \"top1_global\": 0.994625, \"top1_local\": 0.919375, \"val_n\": 120, \"val_r1\": 0.5167, \"val_r10\": 0.9417, \"val_r20\": 0.9583, \"val_r5\": 0.85}",
+    "projection_dim": "512",
+    "score": "max_t cosine(audio_frame_t, hotword)",
+    "source_checkpoint": "best.pt",
+    "source_checkpoint_sha256": "af547a4d92298b1cb3176ae2a15ac89656d4f81a26617ce2530b0899b88e00cc"
+  },
+  "experiment": "glclap_hotword_retriever",
+  "format": "glclap-adapter-v1",
+  "metrics": {
+    "epoch": 3,
+    "global_loss": 0.015569547556340695,
+    "local_loss": 0.23039130505919456,
+    "loss": 0.24596085235476495,
+    "step": 18190,
+    "top1_global": 0.994625,
+    "top1_local": 0.919375,
+    "val_n": 120,
+    "val_r1": 0.5167,
+    "val_r10": 0.9417,
+    "val_r20": 0.9583,
+    "val_r5": 0.85
+  },
+  "parameter_count": 5254145,
+  "projection_dim": "512",
+  "score": "max_t cosine(audio_frame_t, hotword)",
+  "sha256": "c20f5b9869b27bc13e092fbbdd9ebab453970011172dccf2c47486b06a4ec22f",
+  "source_checkpoint": "best.pt",
+  "source_checkpoint_sha256": "af547a4d92298b1cb3176ae2a15ac89656d4f81a26617ce2530b0899b88e00cc",
+  "tensor_count": 13
+}
